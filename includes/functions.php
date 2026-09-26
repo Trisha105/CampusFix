@@ -178,18 +178,26 @@ function base_url(string $path = ''): string {
     static $baseUrl = null;
 
     if ($baseUrl === null) {
-        $docRoot = str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
-        $appRoot = str_replace('\\', '/', realpath(__DIR__ . '/..'));
-
-        if ($docRoot !== '' && strpos($appRoot, $docRoot) === 0) {
-            $subPath = substr($appRoot, strlen($docRoot));
-            $baseUrl = '/' . trim($subPath, '/') . '/';
-            if ($baseUrl === '//') {
-                $baseUrl = '/';
-            }
+        // Allow manual override via environment variable (for Render/Docker/cloud hosting)
+        // Set APP_BASE_URL=/ in Render env vars since the app lives at document root
+        $envBase = getenv('APP_BASE_URL');
+        if ($envBase !== false && $envBase !== '') {
+            $baseUrl = rtrim($envBase, '/') . '/';
+            if ($baseUrl === '//') $baseUrl = '/';
         } else {
-            // Default fallback for XAMPP htdocs/CampusFix
-            $baseUrl = '/CampusFix/';
+            $docRoot = str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT'] ?? ''));
+            $appRoot = str_replace('\\', '/', realpath(__DIR__ . '/..'));
+
+            if ($docRoot !== '' && strpos($appRoot, $docRoot) === 0) {
+                $subPath = substr($appRoot, strlen($docRoot));
+                $baseUrl = '/' . trim($subPath, '/') . '/';
+                if ($baseUrl === '//') {
+                    $baseUrl = '/';
+                }
+            } else {
+                // Default fallback for XAMPP htdocs/CampusFix
+                $baseUrl = '/CampusFix/';
+            }
         }
     }
 

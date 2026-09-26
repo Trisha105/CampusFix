@@ -1,0 +1,25 @@
+Options -Indexes
+DirectoryIndex index.php index.html
+
+# Deny access to sensitive directories and files
+<FilesMatch "\.(sql|log|env|gitignore|dockerignore|yaml|yml|md)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Block access to config directory
+<DirectoryMatch "^(.*/)?config">
+    Require all denied
+</DirectoryMatch>

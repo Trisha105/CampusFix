@@ -1,0 +1,42 @@
+FROM php:8.2-apache
+
+# Install system dependencies and SSL certificates
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install required PHP extensions
+RUN docker-php-ext-install pdo pdo_mysql mysqli
+
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
+
+# Set Apache document root to project root
+ENV APACHE_DOCUMENT_ROOT /var/www/html
+
+# Update Apache default site config
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# Allow .htaccess overrides in document root
+RUN echo '<Directory /var/www/html>\n\
+    Options Indexes FollowSymLinks\n\
+    AllowOverride All\n\
+    Require all granted\n\
+</Directory>' >> /etc/apache2/conf-available/campusfix.conf \
+    && a2enconf campusfix
+
+# Copy project files into the container
+COPY . /var/www/html/
+
+# Fix permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && find /var/www/html -type d -exec chmod 755 {} \; \
+    && find /var/www/html -type f -exec chmod 644 {} \;
+
+# Expose port 80
+EXPOSE 80
+
+# Start Apache in foreground
+CMD ["apache2-foreground"]
