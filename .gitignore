@@ -1,0 +1,35 @@
+# CampusFix - Git Ignore
+# Exclude PHP session files, logs, local config, and OS clutter
+
+# PHP Sessions
+/tmp/
+*.session
+
+# PHP Error Logs
+*.log
+error_log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# IDE / Editor folders
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Environment / secrets (if added later)
+.env
+.env.local
+.env.production
+
+# Composer (not used, but just in case)
+/vendor/
+composer.lock
