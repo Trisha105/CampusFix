@@ -20,11 +20,11 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
 # Allow .htaccess overrides in document root
-RUN echo '<Directory /var/www/html>\n\
-    Options Indexes FollowSymLinks\n\
-    AllowOverride All\n\
-    Require all granted\n\
-</Directory>' >> /etc/apache2/conf-available/campusfix.conf \
+RUN printf '%s\n' '<Directory /var/www/html>' \
+    'Options FollowSymLinks' \
+    'AllowOverride All' \
+    'Require all granted' \
+    '</Directory>' > /etc/apache2/conf-available/campusfix.conf \
     && a2enconf campusfix
 
 # Copy project files into the container
