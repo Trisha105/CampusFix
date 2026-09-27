@@ -19,7 +19,8 @@ DirectoryIndex index.php index.html
     Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# Block access to config directory
-<DirectoryMatch "^(.*/)?config">
-    Require all denied
-</DirectoryMatch>
+# Keep application internals out of the public document root.
+# DirectoryMatch is not valid in .htaccess, so use a rewrite rule here.
+<IfModule mod_rewrite.c>
+    RewriteRule ^(?:config|database|includes)(?:/|$) - [F,L]
+</IfModule>

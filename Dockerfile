@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y \
 # Install required PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Enable Apache rewrite rules and response headers
+RUN a2enmod rewrite headers
 
 # Set Apache document root to project root
 ENV APACHE_DOCUMENT_ROOT /var/www/html
@@ -39,4 +39,4 @@ RUN chown -R www-data:www-data /var/www/html \
 EXPOSE 80
 
 # Start Apache in foreground
-CMD ["apache2-foreground"]
+CMD ["sh", "-c", "php /var/www/html/database/bootstrap.php && exec apache2-foreground"]

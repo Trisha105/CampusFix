@@ -54,6 +54,9 @@ function getDBConnection(): PDO {
         } catch (PDOException $e) {
             // Log the error internally, never expose credentials or stack traces
             error_log('Database connection failed: ' . $e->getMessage());
+            if (PHP_SAPI === 'cli') {
+                throw $e;
+            }
             http_response_code(503);
             die('<h2 style="font-family:sans-serif;color:#c00;padding:2rem;">
                     Service Temporarily Unavailable

@@ -127,16 +127,6 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <!-- Demo Hint Box for Evaluation -->
-            <div class="card mt-3 bg-light border-0 shadow-sm">
-                <div class="card-body p-3 small text-muted">
-                    <strong class="d-block text-dark mb-1"><i class="bi bi-info-circle me-1 text-primary"></i>Demo Account Credentials:</strong>
-                    <div class="d-flex justify-content-between">
-                        <span>Admin:</span>
-                        <code>admin@campusfix.edu / admin123</code>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>

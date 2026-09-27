@@ -1,5 +1,13 @@
 # CampusFix — Campus Complaint Tracking System
 
+## Public deployment (Render + TiDB Cloud)
+
+The Docker image runs PHP/Apache and initializes an empty MySQL-compatible database at startup. Connect this repository to a Render web service using `render.yaml`, and create a TiDB Cloud database first. Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` in Render. Leave `DB_SSL=true`. Set `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters for the first administrator. The startup script creates the tables and administrator once; it does not reset an existing administrator's password. After the first successful deploy, remove `ADMIN_PASSWORD` from Render's environment settings so it is not retained there.
+
+Do not import `database/campusfix.sql` into a public database: it contains demo users with published passwords. The Docker image excludes that file and the legacy `database/create_admin.php` endpoint. For local XAMPP demonstrations, the demo SQL remains available in the repository.
+
+The older local XAMPP instructions and demo credentials below apply only to local development.
+
 A full-stack, university-grade web application designed for campus facility maintenance, problem reporting, and structured administrative resolution.
 
 ---
