@@ -6,6 +6,10 @@
 Dockerfile
 .dockerignore
 
+# Local-only demo data and legacy setup endpoint
+database/campusfix.sql
+database/create_admin.php
+
 # Local dev files
 *.log
 error_log
