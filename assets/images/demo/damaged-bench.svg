@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">DAMAGED BENCH</title>
+  <desc id="desc">Illustrated placeholder for North courtyard</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#134e4a"/></linearGradient></defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="220" r="158" fill="#f59e0b" opacity=".14"/>
+  <circle cx="480" cy="220" r="127" fill="#fff" opacity=".08"/>
+  <g transform="translate(480 221)" fill="none" stroke="#f59e0b" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d='M-108-49h216v27h-216zM-108-2h216v27h-216zM-84 25v63M82 25v63M-72 45H72M-87-49v-24M86-49v-24'/><path d='M-17-49 5-22-13 2M-25-2 0 25'/></g>
+  <text x="480" y="441" text-anchor="middle" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="700" letter-spacing="3">DAMAGED BENCH</text>
+  <text x="480" y="484" text-anchor="middle" fill="#cbd5e1" font-family="Arial,Helvetica,sans-serif" font-size="23">North courtyard · illustrative placeholder</text>
+</svg>

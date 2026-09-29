@@ -22,5 +22,5 @@ DirectoryIndex index.php index.html
 # Keep application internals out of the public document root.
 # DirectoryMatch is not valid in .htaccess, so use a rewrite rule here.
 <IfModule mod_rewrite.c>
-    RewriteRule ^(?:config|database|includes)(?:/|$) - [F,L]
+    RewriteRule ^(?:config|database|includes|data)(?:/|$) - [F,L]
 </IfModule>
