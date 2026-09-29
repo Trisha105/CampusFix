@@ -81,6 +81,11 @@ $isAdminDir  = ($currentDir === 'admin');
                         </a>
                     </li>
                 <?php endif; ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= in_array($currentPage, ['demo_complaints.php', 'demo_complaint_view.php'], true) ? 'active' : ''; ?>" href="<?= base_url('demo_complaints.php'); ?>">
+                        <i class="bi bi-collection me-1"></i> Demo Complaints
+                    </a>
+                </li>
             </ul>
 
             <ul class="navbar-nav align-items-lg-center">

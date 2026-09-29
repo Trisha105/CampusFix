@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">UNSAFE WIRE</title>
+  <desc id="desc">Illustrated placeholder for Engineering workshop</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#134e4a"/></linearGradient></defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <circle cx="480" cy="220" r="158" fill="#ef4444" opacity=".14"/>
+  <circle cx="480" cy="220" r="127" fill="#fff" opacity=".08"/>
+  <g transform="translate(480 221)" fill="none" stroke="#ef4444" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d='M-105-74h210M-57-74v62c0 21 30 21 30 41M58-74v33c0 25-25 23-25 53'/><path d='M-6-15 17-15 1 16 25 16-15 78l10-43h-21Z'/><path d='M-63 69h126M-38 69l-14 20M38 69l14 20'/></g>
+  <text x="480" y="441" text-anchor="middle" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="700" letter-spacing="3">UNSAFE WIRE</text>
+  <text x="480" y="484" text-anchor="middle" fill="#cbd5e1" font-family="Arial,Helvetica,sans-serif" font-size="23">Engineering workshop · illustrative placeholder</text>
+</svg>
