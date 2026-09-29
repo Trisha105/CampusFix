@@ -8,10 +8,6 @@ Do not import `database/campusfix.sql` into a public database: it contains demo 
 
 The older local XAMPP instructions and demo credentials below apply only to local development.
 
-## Read-only demo complaints
-
-The public **Demo Complaints** page (`demo_complaints.php`) shows ten illustrative campus reports with filters, status badges, local SVG placeholders, upvote counts, and a status timeline on each detail page. The sample records live only in `data/demo_complaints.php`; they are never imported into the production `complaints` table. Student and administrator complaint lists keep using real database records and their existing access rules. To replace the samples with API data, change the data source loaded by `demo_complaints.php` and `demo_complaint_view.php`; to remove the showcase, remove those routes and their navigation links.
-
 A full-stack, university-grade web application designed for campus facility maintenance, problem reporting, and structured administrative resolution.
 
 ---

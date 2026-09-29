@@ -102,9 +102,6 @@ $categoryCards = [
                             </a>
                         <?php endif; ?>
                     <?php endif; ?>
-                    <a href="<?= base_url('demo_complaints.php'); ?>" class="btn btn-outline-primary btn-lg px-4">
-                        <i class="bi bi-collection me-2"></i>Explore Demo Complaints
-                    </a>
                 </div>
             </div>
             <div class="col-lg-5">
