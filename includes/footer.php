@@ -12,7 +12,7 @@
                 <p class="text-muted small mb-0 mt-1">Simple, accountable, and transparent problem resolution for university campuses.</p>
             </div>
             <div class="col-md-6 text-center text-md-end text-muted small">
-                <span>&copy; <?= date('Y'); ?> CampusFix. Built with PHP 8, PDO & Bootstrap 5.</span>
+                <span>&copy; <?= date('Y'); ?> CampusFix. Built with HTML5, CSS3, MySQL &amp; PHP.</span>
             </div>
         </div>
     </div>
