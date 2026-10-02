@@ -16,4 +16,4 @@ The administrator update locks the complaint and commits the current state, even
 - A student Pending-complaint edit from High to Low wrote one old/new priority event and an admin notification. The local sample was restored and test rows removed.
 - Mobile detail page at 390 px was visually reviewed with the empty timeline/comment state.
 
-Cloudinary live actions, TiDB staging, Docker build and production browser checks are still pending. None of these local checks should be treated as production acceptance.
+Render's Docker build and deploy succeeded on 2 October 2026, and the production TiDB SQL editor showed `003_activity` in `schema_migrations` plus the event, comment and notification tables. Authenticated production browser checks are still pending. The local browser checks above should not be treated as production acceptance.
