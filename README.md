@@ -1,453 +1,359 @@
-# CampusFix — Campus Complaint Tracking System
+# CampusFix
 
-## Versioned database migrations
+### Campus Complaint Tracking System
 
-Production startup now runs `database/migrations/*.sql` through `database/bootstrap.php` and records applied versions in `schema_migrations`. For a manual CLI run, use `php database/migrate.php`. Read [migration, backup and recovery instructions](docs/migrations.md) before upgrading an existing database. Existing `users` and `complaints` rows are preserved by the baseline migration.
+CampusFix helps university students report campus facility problems and helps administrators review complaints, communicate with students, and record resolutions. It combines complaint tracking, protected photo evidence, a history of status and priority changes, and private in-app notifications in a responsive PHP application.
 
-## Optional protected images
+**Core stack:** HTML5 · CSS3 · JavaScript · PHP · PDO · MySQL-compatible database  
+**Interface:** Bootstrap 5 and Bootstrap Icons  
+**Image integration:** Cloudinary PHP SDK  
+**Deployment configuration:** Docker on Render with an external database
 
-Complaint evidence and student profile pictures use Cloudinary's authenticated delivery type. Set `CLOUDINARY_URL` only in the deployment environment; see [image setup and verification](docs/images.md). The rest of CampusFix works while image storage is unconfigured.
+## Contents
 
-## Public deployment (Render + TiDB Cloud)
+- [Overview](#overview)
+- [Implemented features](#implemented-features)
+- [Complaint workflow](#complaint-workflow)
+- [Technology and architecture](#technology-and-architecture)
+- [Repository guide](#repository-guide)
+- [Database design](#database-design)
+- [Local installation](#local-installation)
+- [Environment configuration](#environment-configuration)
+- [Render deployment](#render-deployment)
+- [Protected images and maintenance](#protected-images-and-maintenance)
+- [Security controls](#security-controls)
+- [Verification and troubleshooting](#verification-and-troubleshooting)
+- [Project demonstration](#project-demonstration)
+- [Documentation and viva notes](#documentation-and-viva-notes)
 
-The repository includes a root `Dockerfile`, `.dockerignore`, and `render.yaml`. The image uses PHP 8.4/Apache with PDO MySQL, cURL and mbstring, enables the application's Apache rules, and listens on Render's `PORT` (default `10000`). The image contains versioned migrations and Composer dependencies, while local demo SQL and setup endpoints are excluded.
+## Overview
 
-For an existing Render service:
+Verbal reports and informal messages make maintenance issues difficult to track. CampusFix keeps the report, current status, administrative response, supporting evidence, and conversation together in one complaint record.
 
-1. Use the **Docker** runtime and the **master** branch. Leave **Root Directory** empty, set **Dockerfile Path** to `./Dockerfile`, and leave **Docker Command** empty so the image's startup command runs.
-2. Create the MySQL-compatible database first, then set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` in Render's **Environment** settings. Use the database provider's connection values. For TiDB Cloud, set `DB_SSL=true`.
-3. Set `APP_BASE_URL=/`. For the first administrator, set a valid `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters.
-4. Back up the database, then choose **Manual Deploy → Deploy latest commit**. The startup script runs pending migrations and creates the administrator only if that email does not already exist; it does not reset an existing administrator's password. See [migration and recovery procedure](docs/migrations.md).
-5. After verifying the first admin login, remove **both** `ADMIN_EMAIL` and `ADMIN_PASSWORD` from Render. The bootstrap requires the pair when either is present, so leaving only the email would make a later startup fail.
+The current application has two roles: **student** and **administrator**. Students access their own complaints; administrators manage the campus-wide queue. The features below describe the code currently available on `master`. Provider configuration and live verification are documented separately.
 
-For a new service, you can use `render.yaml` as a Render Blueprint instead. Secrets marked `sync: false` must be entered in Render; they are not stored in Git. On an existing service, verify its Environment settings directly. The database must remain external to the web container.
+## Implemented features
 
-For protected images, set `CLOUDINARY_URL` in the service Environment. This secret is not required for core complaint and activity routes. After deploying the image-capable build, verify one authorized upload, view and removal before relying on the feature.
+### Student workspace
 
-A missing-Dockerfile build error means the selected commit or Dockerfile path is wrong. If the image builds but startup reports a database connection failure, check the database hostname, port, credentials, database name, TLS setting, and the provider's network access rules. Do not put database passwords into the Dockerfile.
-Do not import `database/campusfix.sql` into a public database: it contains demo users with published passwords. The Docker image excludes that file and the legacy `database/create_admin.php` endpoint. For local XAMPP demonstrations, the demo SQL remains available in the repository.
+| Feature | Current behavior |
+| --- | --- |
+| Registration and login | Register with full name, student ID, email, and password; sign in using session authentication. |
+| Personal dashboard | Total, Pending, In Progress, and Resolved counts, plus the five most recent complaints. |
+| Complaint submission | Submit a title, category, campus location, priority, and description; receive a tracking code such as `CMP-0001`. |
+| Search and filtering | Search title, tracking code, location, and description; combine category, priority, and status filters. |
+| Complaint management | Edit or delete an owned complaint while its status is **Pending**. |
+| Resolution review | View the current status and administrator's resolution note. |
+| Photo evidence | Add and remove before-repair images on an owned Pending complaint when image storage is configured. |
+| Conversation | Post comments and one-level replies to administrators on an owned complaint. |
+| Activity timeline | View the recorded actor, time, and old/new status or priority values. |
+| Notifications | See an unread bell count and a notification list; mark individual entries or all entries as read. |
+| Profile | Update full name and student ID; email is read-only. Upload, replace, or remove an optional protected profile picture. |
 
-The older local XAMPP instructions and demo credentials below apply only to local development.
+### Administrator workspace
 
-A full-stack, university-grade web application designed for campus facility maintenance, problem reporting, and structured administrative resolution.
+| Feature | Current behavior |
+| --- | --- |
+| Campus dashboard | Total, Pending, In Progress, Resolved, and High Priority counts, plus five recent reports. |
+| Complaint queue | View complaints across all students, search records, and filter by category, priority, or status. |
+| Status and priority management | Change the complaint's status and priority; a resolution note is required when marking it **Resolved**. |
+| Evidence management | Add after-repair images and remove complaint evidence. The three-image limit applies to the whole complaint. |
+| Student communication | Read and respond to complaint comments and one-level replies. |
+| Activity and notifications | Review recorded changes and receive notifications for new complaints, student comments, and student priority changes. |
+| User directory | View registered students and administrators in a read-only directory. |
 
----
+### Shared infrastructure
 
-## Table of Contents
-1. [Project Overview](#1-project-overview)
-2. [Problem Statement](#2-problem-statement)
-3. [System Objectives](#3-system-objectives)
-4. [Features by Role](#4-features-by-role)
-5. [Technology Stack](#5-technology-stack)
-6. [3-Tier Architecture](#6-3-tier-architecture)
-7. [Project Folder Structure](#7-project-folder-structure)
-8. [Database Design & ER Relationship](#8-database-design--er-relationship)
-9. [XAMPP Setup & Installation](#9-xampp-setup--installation)
-10. [Database Import Instructions](#10-database-import-instructions)
-11. [Database Configuration](#11-database-configuration)
-12. [Administrator Setup](#12-administrator-setup)
-13. [Demo Credentials (DEMO ONLY)](#13-demo-credentials-demo-only)
-14. [Security Implementation](#14-security-implementation)
-15. [Known Limitations](#15-known-limitations)
-16. [Future Improvements](#16-future-improvements)
-17. [Project Report / Screenshot Checklist](#17-project-report--screenshot-checklist)
-18. [Live Demonstration Script](#18-live-demonstration-script)
-19. [Viva Cheat Sheet (Questions & Answers)](#19-viva-cheat-sheet-questions--answers)
+- **Versioned migrations:** numbered SQL files, SHA-256 checksums, and a `schema_migrations` ledger support fresh installations and upgrades of the existing baseline schema.
+- **Optional image storage:** core complaint, profile-text, and activity features remain usable when Cloudinary is unconfigured.
+- **Protected delivery:** application routes check the session and ownership/role before retrieving authenticated Cloudinary assets server-side.
+- **Cleanup retries:** failed provider deletions can be recorded in `media_cleanup_jobs` and retried through a CLI command.
+- **Responsive interface:** Bootstrap layouts, status/priority badges, validation feedback, image previews, and flash messages support desktop and mobile use.
 
----
+Notifications are stored in the application database and displayed during page requests. They are in-app notifications; the current implementation does not send email, SMS, or browser push messages.
 
-## 1. Project Overview
-**CampusFix** is a responsive web application that streamlines how university students report physical campus defects (such as Wi-Fi disruptions, broken lab equipment, electrical failures, washroom sanitation, and damaged furniture) and how university administrators inspect, prioritize, and record official resolutions for each problem.
+## Complaint workflow
 
----
+| Stage | Action |
+| --- | --- |
+| Report | A student submits a complaint. The server assigns **Pending**, creates the tracking code and creation event, and notifies administrators. |
+| Add context | The student opens the detail page to add optional evidence or comments. Student edits and evidence removal are limited to Pending complaints. |
+| Review | An administrator reviews the complaint, adjusts priority/status, and communicates through comments. |
+| Resolve | The administrator records a resolution note and marks the complaint **Resolved**. After-repair evidence can be added when storage is configured. |
+| Follow up | The student reviews the status, note, evidence, conversation, timeline, and notifications. |
 
-## 2. Problem Statement
-In traditional university campuses, students report physical maintenance problems verbally, via informal social media groups, or through handwritten logs. This leads to:
-- Lack of accountability and lost complaint records.
-- Inability for students to track resolution status in real-time.
-- Unorganized administrative queues with no centralized prioritization.
-- Duplicate reports for the same classroom or lab issue.
+**Status values:** `Pending`, `In Progress`, `Resolved`.  
+**Priority values:** `Low`, `Medium`, `High`.
 
-**CampusFix** solves this by establishing a central, database-backed platform providing transparent status tracking, role-based controls, and structured resolution notes.
+This describes the usual workflow. Administrators select from the allowed status values; the application does not enforce a one-way transition sequence. Students cannot change their complaint's status or resolution note.
 
----
+**Supported categories:** Wi-Fi / Internet, Electrical, Classroom, Lab Equipment, Cleanliness, Water Supply, Furniture, Washroom, Security, and Other.
 
-## 3. System Objectives
-- **Structured Reporting:** Enable students to submit detailed facility complaints across 10 campus issue categories.
-- **Real-Time Tracking:** Provide students with automated status indicators (`Pending`, `In Progress`, `Resolved`).
-- **Administrative Queue:** Give campus maintenance supervisors a centralized dashboard to prioritize and resolve complaints.
-- **Enterprise Security:** Implement password hashing, PDO prepared statements, output escaping, and CSRF defense.
-- **Academic Readiness:** Deliver a clean codebase with zero third-party framework overhead, suitable for university defense (viva).
+## Technology and architecture
 
----
+| Layer | Implementation |
+| --- | --- |
+| Presentation | HTML5, CSS3, Bootstrap 5.3.3, Bootstrap Icons 1.11.3, and vanilla JavaScript. Bootstrap assets are loaded from a CDN. |
+| Application | PHP route files, shared helpers, session authentication, role/ownership checks, validation, and PDO queries. |
+| Data | MySQL-compatible database with InnoDB tables, `utf8mb4`, foreign keys, and transactional complaint activity updates. Local verification is recorded for MariaDB; TiDB Cloud connection settings are provided for deployment. |
+| Media | Cloudinary PHP SDK installed through Composer, authenticated asset storage, and guarded PHP image-delivery routes. |
+| Runtime | Local Apache/XAMPP; the Docker image uses PHP 8.4 with Apache, PDO MySQL, cURL, mbstring, and fileinfo. |
 
-## 4. Features by Role
+Browser requests reach PHP through Apache. PHP reads/writes application records through PDO. For protected image requests, PHP authorizes the current account, retrieves the Cloudinary image, and returns its bytes with private, no-store cache headers. MySQL stores image references and metadata rather than image binary content.
 
-### Student Capabilities
-- **Account Registration & Login:** Create account with full name, student ID, email, and secure password.
-- **Personal Dashboard:** View 4 summary cards (Total, Pending, In Progress, Resolved) strictly scoped to their own complaints.
-- **Complaint Submission:** File complaints with category, location, priority, and description; automatically assigned unique tracking codes (`CMP-0001`).
-- **Ownership Scoping:** View only their own complaints (cross-account URL access strictly prevented).
-- **Search & Filter:** Search by keywords (`q`) across title, code, location, and description; filter by category, priority, and status.
-- **Complaint Management:** Edit or delete complaints while they remain in `Pending` status.
-- **Resolution Inspection:** Review administrator notes upon resolution.
-- **Profile Management:** View and update full name and unique student ID (email remains read-only).
+## Repository guide
 
-### Administrator Capabilities
-- **Secure Authentication:** Log in through dedicated administrator credentials.
-- **Global Dashboard:** View campus-wide metrics (Total, Pending, In Progress, Resolved, and High Priority) plus 5 latest campus reports.
-- **All-Complaints Queue:** Inspect and filter complaints submitted by any student across campus.
-- **Management Controls:** Update complaint priority (`Low`, `Medium`, `High`) and lifecycle status (`Pending` &rarr; `In Progress` &rarr; `Resolved`).
-- **Mandatory Resolution Notes:** Enforce non-empty resolution notes when marking any complaint as `Resolved`.
-- **User Directory:** Access a read-only directory of all registered students and administrators.
+| Location | Responsibility |
+| --- | --- |
+| [index.php](index.php), [register.php](register.php), [login.php](login.php), [logout.php](logout.php) | Landing page and account access. |
+| [dashboard.php](dashboard.php), [complaints.php](complaints.php), [profile.php](profile.php) | Student dashboard, complaint list, and profile. |
+| [complaint_create.php](complaint_create.php), [complaint_view.php](complaint_view.php), [complaint_edit.php](complaint_edit.php), [complaint_delete.php](complaint_delete.php) | Student complaint lifecycle routes. |
+| [admin/](admin/) | Administrator dashboard, global queue, complaint management, and user directory. |
+| [complaint_comment.php](complaint_comment.php), [notifications.php](notifications.php), [notification_read.php](notification_read.php) | Conversation and private notification actions. |
+| [complaint_image.php](complaint_image.php), [complaint_image_upload.php](complaint_image_upload.php), [complaint_image_delete.php](complaint_image_delete.php) | Authorized complaint evidence delivery, upload, and removal. |
+| [profile_image.php](profile_image.php), [profile_image_upload.php](profile_image_upload.php), [profile_image_delete.php](profile_image_delete.php) | Protected profile-picture routes. |
+| [config/database.php](config/database.php) | Environment-based PDO connection configuration. |
+| [includes/](includes/) | Authentication, CSRF/escaping helpers, shared layout, media adapter, and activity helpers. |
+| [assets/](assets/) | Application stylesheet and browser interactions. |
+| [database/migrations/](database/migrations/), [database/migrations.php](database/migrations.php) | Versioned schema files and migration runner. |
+| [database/bootstrap.php](database/bootstrap.php), [database/migrate.php](database/migrate.php) | CLI startup/bootstrap and manual migration entry points. |
+| [database/media_cleanup.php](database/media_cleanup.php) | CLI retry of queued provider deletions. |
+| [Dockerfile](Dockerfile), [docker/start.sh](docker/start.sh), [render.yaml](render.yaml) | Container build, startup, and Render Blueprint configuration. |
+| [tests/](tests/), [docs/](docs/) | Focused checks and operational/verification documentation. |
 
----
+## Database design
 
-## 5. Technology Stack
-- **Frontend:** HTML5, CSS3, Bootstrap 5.3.3 (via CDN), Bootstrap Icons 1.11.3, Vanilla JavaScript.
-- **Backend:** PHP 8.2+ (pure vanilla PHP using PDO, no frameworks).
-- **Database:** MySQL / MariaDB (InnoDB engine, utf8mb4 charset).
-- **Runtime Environment:** XAMPP for Windows (Apache HTTP Server + MariaDB).
+The current migrated installation contains nine tables:
 
----
+| Table | Purpose and relationships |
+| --- | --- |
+| `users` | Account details, password hashes, and student/admin roles. One user can submit many complaints. |
+| `complaints` | Tracking code, owner, category, location, priority, description, current status, and resolution note. `user_id` references `users`. |
+| `complaint_images` | Before/after asset references and metadata. Links to a complaint and an optional uploader. |
+| `profile_images` | One optional image reference per user; `user_id` is the primary key. |
+| `complaint_events` | Recorded complaint changes, actor, old/new status and priority, and timestamp. |
+| `complaint_comments` | Complaint messages, authors, and optional `parent_id` for one-level replies. |
+| `notifications` | Recipient-specific entries, optional actor/complaint references, and `read_at`. |
+| `media_cleanup_jobs` | Queued Cloudinary deletion retries, attempt counts, and last error. |
+| `schema_migrations` | Applied migration version, checksum, and application timestamp. |
 
-## 6. 3-Tier Architecture
+The migration sequence is:
 
-```text
-+------------------------------------------------------------------+
-|                   Presentation Layer (Client)                    |
-|  - HTML5 & CSS3 Responsive Academic Theme                        |
-|  - Bootstrap 5 Components & Bootstrap Icons                      |
-|  - Vanilla JavaScript (Delete confirms, dynamic validations)    |
-+------------------------------------------------------------------+
-                               |
-                               | HTTP(S) Requests & Responses
-                               v
-+------------------------------------------------------------------+
-|                    Application Layer (Server)                    |
-|  - Apache Web Server (XAMPP)                                     |
-|  - PHP 8+ Core Engine                                            |
-|  - Session Authentication & Role Guards (auth.php)              |
-|  - CSRF & XSS Security Middleware (functions.php)               |
-+------------------------------------------------------------------+
-                               |
-                               | PDO Prepared Statements (UTF-8)
-                               v
-+------------------------------------------------------------------+
-|                      Data Layer (Database)                       |
-|  - MySQL / MariaDB Database (campusfix)                          |
-|  - users Table (Credentials, Roles, Timestamps)                 |
-|  - complaints Table (Taxonomies, Foreign Keys, ON DELETE CASCADE)|
-+------------------------------------------------------------------+
-```
+1. [001_baseline.sql](database/migrations/001_baseline.sql): users and complaints.
+2. [002_images.sql](database/migrations/002_images.sql): complaint/profile images and cleanup jobs.
+3. [003_activity.sql](database/migrations/003_activity.sql): events, comments, and notifications.
 
----
+Complaint deletion cascades to its image-reference and activity rows. Provider asset cleanup is handled by application code and the retry queue. Nullable actor/uploader references preserve associated records when an account reference is removed.
 
-## 7. Project Folder Structure
+Existing complaints have no fabricated historical events: their timeline begins with changes recorded after the activity migration. [database/schema.sql](database/schema.sql) contains the older two-table schema; use the migration runner for the complete current installation.
 
-```text
-CampusFix/
-│
-├── index.php                 # Public landing page (Hero, categories, Login/Register CTAs)
-├── register.php              # Student registration with validation & password hashing
-├── login.php                 # Role-aware authentication for Student and Admin
-├── logout.php                # Session destruction and cookie clearance
-├── dashboard.php             # Student dashboard (4 metric cards, 5 recent complaints)
-├── complaints.php            # Student complaint list with multi-parameter search & filters
-├── complaint_create.php      # Student complaint submission form (auto-generates CMP-XXXX)
-├── complaint_view.php        # Student detail view (resolution notes, Pending edit/delete)
-├── complaint_edit.php        # Student edit form (ownership check, Pending-only rule)
-├── complaint_delete.php      # POST-only deletion endpoint with CSRF & Pending verification
-├── profile.php               # Student profile view and update (unique Student ID check)
-│
-├── admin/
-│   ├── dashboard.php         # Global admin dashboard (5 metric cards, campus-wide list)
-│   ├── complaints.php        # Global complaint queue with student search & multi-filtering
-│   ├── complaint_view.php    # Detail inspection view with student card & management form
-│   ├── complaint_update.php  # POST-only status, priority, and resolution note endpoint
-│   └── users.php             # Read-only user directory (IDs, names, emails, roles, dates)
-│
-├── config/
-│   └── database.php          # Centralized PDO connection with ERRMODE_EXCEPTION & UTF-8
-│
-├── includes/
-│   ├── auth.php              # Session initialization, route guards, current user helpers
-│   ├── functions.php         # CSRF helpers, e() escaping, flash messages, taxonomies, badges
-│   ├── header.php            # Role-aware Bootstrap 5 navbar and flash alert container
-│   └── footer.php            # Academic footer and JavaScript bundle imports
-│
-├── assets/
-│   ├── css/
-│   │   └── style.css         # Academic teal/blue theme, card layouts, mobile responsiveness
-│   └── js/
-│       └── app.js            # Vanilla JavaScript delete confirmations & status interactions
-│
-├── database/
-│   ├── campusfix.sql         # Database schema, table constraints, and realistic demo data
-│   └── create_admin.php      # Secure one-time administrator account creation utility
-│
-└── README.md                 # Complete documentation, setup guide, and viva cheat sheet
-```
+## Local installation
 
----
+### Prerequisites
 
-## 8. Database Design & ER Relationship
+- PHP 8.2+ with PDO MySQL, mbstring, cURL, and fileinfo enabled.
+- Apache with `.htaccess` overrides, `mod_rewrite`, and `mod_headers`; XAMPP is a local development option.
+- A running MySQL/MariaDB database server and Composer.
+- A Cloudinary account only if testing image actions. The core application can run without it.
 
-### Entity-Relationship Diagram
-```text
-  +--------------------------+               +--------------------------------------+
-  |          USERS           | 1           * |              COMPLAINTS              |
-  +--------------------------+---------------+--------------------------------------+
-  | PK  id (INT)             |<-------------+| PK  id (INT)                         |
-  |     full_name (VARCHAR)  |               |     complaint_code (VARCHAR, UNIQUE) |
-  |     student_id (VARCHAR) |               | FK  user_id (INT)                    |
-  |     email (VARCHAR)      |               |     title (VARCHAR)                  |
-  |     password (VARCHAR)   |               |     category (ENUM)                  |
-  |     role (ENUM)          |               |     location (VARCHAR)               |
-  |     created_at (TS)      |               |     priority (ENUM)                  |
-  +--------------------------+               |     description (TEXT)               |
-                                             |     status (ENUM)                    |
-                                             |     resolution_note (TEXT)           |
-                                             |     created_at (TIMESTAMP)           |
-                                             |     updated_at (TIMESTAMP)           |
-                                             +--------------------------------------+
-```
+### Clean installation
 
-### Table: `users`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | `INT` | Primary Key, Auto Increment | Unique internal user identifier |
-| `full_name` | `VARCHAR(100)` | NOT NULL | User's complete legal name |
-| `student_id` | `VARCHAR(30)` | UNIQUE, Nullable | Academic ID (e.g. STU-2024-001) |
-| `email` | `VARCHAR(150)` | UNIQUE, NOT NULL | Account login email address |
-| `password` | `VARCHAR(255)` | NOT NULL | Bcrypt hash generated via `password_hash()` |
-| `role` | `ENUM` | 'student', 'admin' | Access tier (default: 'student') |
-| `created_at` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Registration timestamp |
+1. Clone the repository into Apache's document root. For XAMPP, use `C:\xampp\htdocs\CampusFix`.
 
-### Table: `complaints`
-| Column | Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | `INT` | Primary Key, Auto Increment | Unique internal complaint identifier |
-| `complaint_code` | `VARCHAR(20)` | UNIQUE, NOT NULL | Formatted tracking code (`CMP-0001`) |
-| `user_id` | `INT` | Foreign Key &rarr; `users.id` | Submitting student (ON DELETE CASCADE) |
-| `title` | `VARCHAR(150)` | NOT NULL | Concise problem summary |
-| `category` | `ENUM` | 10 Allowed Categories | Campus issue taxonomy |
-| `location` | `VARCHAR(150)` | NOT NULL | Specific physical room/building |
-| `priority` | `ENUM` | 'Low', 'Medium', 'High' | Urgency level (default: 'Medium') |
-| `description` | `TEXT` | NOT NULL | Detailed problem description |
-| `status` | `ENUM` | 'Pending', 'In Progress', 'Resolved' | Lifecycle state (default: 'Pending') |
-| `resolution_note` | `TEXT` | Nullable | Official administrator resolution note |
-| `created_at` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
-| `updated_at` | `TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | Last modification timestamp |
-
----
-
-## 9. XAMPP Setup & Installation
-1. Download and install **XAMPP** (with PHP 8.2+ and MySQL) from [apachefriends.org](https://www.apachefriends.org/).
-2. Open the **XAMPP Control Panel**.
-3. Start the **Apache** module and the **MySQL** module.
-4. Place the `CampusFix` project directory into XAMPP's web directory:
-   ```text
-   C:\xampp\htdocs\CampusFix
-   ```
-5. Access the application in your browser:
-   ```text
-   http://localhost/CampusFix
+   ```sh
+   git clone https://github.com/Trisha105/CampusFix.git
+   cd CampusFix
+   composer install
    ```
 
----
+2. Create an empty database in phpMyAdmin or a MySQL client:
 
-## 10. Database Import Instructions
-1. Open your web browser and navigate to **phpMyAdmin**:
-   ```text
-   http://localhost/phpmyadmin
+   ```sql
+   CREATE DATABASE campusfix
+     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-2. Click on the **Import** tab at the top.
-3. Click **Choose File** and select:
-   ```text
-   C:\xampp\htdocs\CampusFix\database\campusfix.sql
+
+3. Configure the PHP process's database environment variables if they differ from the local defaults below, then run:
+
+   ```sh
+   php database/migrate.php
    ```
-4. Click **Go** at the bottom of the page.
-5. The `campusfix` database and tables (`users`, `complaints`) will be created and seeded with realistic demo records.
 
-*Alternatively, import via Command Prompt / PowerShell:*
-```powershell
-Get-Content "C:\xampp\htdocs\CampusFix\database\campusfix.sql" | & "C:\xampp\mysql\bin\mysql.exe" -u root
-```
+4. Provision the first administrator using the CLI bootstrap. Replace the example email/password with your own values. Example for PowerShell:
 
----
-
-## 11. Database Configuration
-Database credentials are centralized in [`config/database.php`](file:///C:/xampp/htdocs/CampusFix/config/database.php):
-```php
-define('DB_HOST', '127.0.0.1');
-define('DB_PORT', '3306');
-define('DB_NAME', 'campusfix');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-```
-If your local MySQL uses a different port or password, adjust these constants accordingly.
-
----
-
-## 12. Administrator Setup
-An administrator account is pre-seeded in `campusfix.sql`. To create or reset the administrator account manually at any time:
-1. Navigate to:
-   ```text
-   http://localhost/CampusFix/database/create_admin.php
-   ```
-   *or run via CLI:*
    ```powershell
-   & "C:\xampp\php\php.exe" "C:\xampp\htdocs\CampusFix\database\create_admin.php"
+   $env:ADMIN_EMAIL = 'admin@example.edu'
+   $env:ADMIN_PASSWORD = 'replace-with-a-unique-password'
+   php database/bootstrap.php
+   Remove-Item Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD
    ```
-2. The script will securely hash the password with `password_hash()` and initialize `admin@campusfix.edu`.
-3. **Security Notice:** Remove or restrict access to `database/create_admin.php` on live servers.
 
----
+   The password must contain at least 12 characters. Bootstrap creates a missing administrator; it does not reset an existing administrator's password. PHP/XAMPP users may need the full executable path, such as `C:\xampp\php\php.exe`.
 
-## 13. Demo Credentials (DEMO ONLY)
+5. Start Apache and the database service, then open `http://localhost/CampusFix/`. Register a student and sign in with the administrator configured above.
 
-> [!NOTE]
-> All passwords listed below are for local evaluation and academic demonstration only.
+`APP_BASE_URL` is normally detected for the XAMPP subdirectory. Set it to `/CampusFix/` if an explicit override is needed. The application reads environment variables with `getenv()`; a `.env` file is not automatically loaded. Terminal environment changes apply to that process and its children, not an already running Apache service.
 
-| Role | Name | Email Address | Password | Student ID |
-| :--- | :--- | :--- | :--- | :--- |
-| **Administrator** | System Administrator | `admin@campusfix.edu` | `admin123` | *N/A* |
-| **Student** | Nadia Rahman | `nadia@campus.edu` | `password123` | `STU-2024-001` |
-| **Student** | Arif Hasan | `arif@campus.edu` | `password123` | `STU-2024-002` |
-| **Student** | Demo Student | `demo@campus.edu` | `password123` | `STU-2024-003` |
+### Optional local demo data
 
----
+For a disposable, offline/local demonstration, import [database/campusfix.sql](database/campusfix.sql) instead of creating the clean baseline, then run `php database/migrate.php` to add the current tables. The published local demo accounts include:
 
-## 14. Security Implementation
-- **Password Protection:** Stored using `password_hash($pass, PASSWORD_DEFAULT)` and verified using timing-safe `password_verify()`. Raw passwords are never stored or logged.
-- **SQL Injection Prevention:** 100% of database queries containing user parameters use PDO prepared statements with bounded parameters (`?`). Emulation is disabled (`PDO::ATTR_EMULATE_PREPARES => false`).
-- **Cross-Site Scripting (XSS) Prevention:** All dynamic data rendered in HTML templates passes through the custom `e()` helper function which executes `htmlspecialchars($val, ENT_QUOTES, 'UTF-8')`.
-- **Cross-Site Request Forgery (CSRF):** Every state-changing form (Registration, Login, Create Complaint, Edit Complaint, Delete Complaint, Profile Update, Admin Status Update) includes a hidden cryptographically secure token verified via `hash_equals()`.
-- **Insecure Direct Object Reference (IDOR) Protection:** Student detail, edit, and delete operations query using both the record ID and the logged-in session ID (`WHERE id = ? AND user_id = ?`). Attempting to manipulate URL IDs yields immediate access denial.
-- **State Integrity:** Newly created complaints are forced to `Pending` on the server. Student edit forms ignore any attempt to modify status or complaint codes.
-- **HTTP Method Safety:** Delete actions require `POST` requests with CSRF tokens; `GET` delete requests are rejected (`405 Method Not Allowed`).
-- **Session Hardening:** Calls `session_regenerate_id(true)` immediately after successful login to mitigate session fixation attacks.
+| Role | Email | Local demo password |
+| --- | --- | --- |
+| Administrator | `admin@campusfix.edu` | `admin123` |
+| Student | `demo@campus.edu` | `password123` |
 
----
+These credentials belong to the local demo dataset only. Public deployments use the clean migrations and a unique first-administrator password. The Docker image excludes both the demo SQL and the legacy [database/create_admin.php](database/create_admin.php) utility; use `database/bootstrap.php` for the current setup.
 
-## 15. Known Limitations
-- File/photo attachment uploads are intentionally omitted to keep the project lightweight and reliable for viva defense without file permission issues.
-- Email/SMS dispatch is omitted to prevent external SMTP dependencies during offline examination environments.
-- Single campus organization model (departments are not split into multi-tenant sub-organizations).
+## Environment configuration
 
----
+| Variable | Local/default value | Purpose |
+| --- | --- | --- |
+| `DB_HOST` | `127.0.0.1` | Database hostname; use the provider value in production. |
+| `DB_PORT` | `3306` | Database port; use the provider value in production. |
+| `DB_NAME` | `campusfix` | Existing database to connect to. |
+| `DB_USER` | `root` | Database user; use the provider credentials in production. |
+| `DB_PASS` | Empty locally | Database password. |
+| `DB_SSL` | Disabled unless exactly `true` | Enables the cloud database TLS configuration. Render Blueprint sets `true`; the Docker image includes the system CA bundle. |
+| `APP_BASE_URL` | Detected locally; `/` in Docker | Application URL path prefix. |
+| `PORT` | `10000` in Docker | Apache listen port configured by the startup script. |
+| `CLOUDINARY_URL` | Unconfigured | Optional Cloudinary SDK connection URL for image actions. |
+| `ADMIN_EMAIL` | Unconfigured | First administrator email for CLI bootstrap. |
+| `ADMIN_PASSWORD` | Unconfigured | First administrator password, minimum 12 characters. |
 
-## 16. Future Improvements
-- **Photo Evidence:** Allow students to upload photos of physical damage (JPEG/PNG).
-- **Automated Notifications:** Integrate email alerts via PHPMailer when a complaint is marked `In Progress` or `Resolved`.
-- **Department Routing:** Auto-assign complaints to specific facility departments (e.g. Electrical, Plumbing, IT).
-- **Analytical Charts:** Render Chart.js visual breakdowns of complaints by status, category, and average resolution time.
+Set database credentials, Cloudinary configuration, and bootstrap credentials in the deployment environment. `ADMIN_EMAIL` and `ADMIN_PASSWORD` must be configured as a pair; remove both after confirming the first administrator login. Bootstrap requires an existing database and runs pending migrations before creating the administrator.
 
----
+## Render deployment
 
-## 17. Project Report / Screenshot Checklist
+1. Create an external MySQL-compatible database and obtain its connection values. For TiDB Cloud, configure `DB_SSL=true`.
+2. Create or configure a Render web service using this repository, the **Docker** runtime, and the **master** branch.
+3. Leave **Root Directory** empty, use **Dockerfile Path** `./Dockerfile`, and leave **Docker Command** empty so the image's startup command runs.
+4. Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_SSL`, and `APP_BASE_URL=/` in Environment. Configure the first-administrator pair if needed; configure `CLOUDINARY_URL` for images.
+5. For an existing database, follow the [backup and migration procedure](docs/migrations.md) before deployment. Run one migrator at a time.
+6. Select **Manual Deploy → Deploy latest commit**, or use the commit-triggered deployment configured for the service.
+7. Review build/startup logs, verify both roles and a complaint workflow, then remove both bootstrap administrator variables after successful first login. Verify an authorized image upload/view/removal separately.
 
-Capture these 15 screenshots for your laboratory report or presentation slides:
+[render.yaml](render.yaml) provides a Blueprint alternative for new services. Entries marked `sync: false` require values supplied through Render; existing services should have their Environment settings checked directly.
 
-1. **Home Page (`index.php`):** Hero section "Report. Track. Resolve." and category grid.
-2. **Registration Page (`register.php`):** Student sign-up form with validation indicators.
-3. **Login Page (`login.php`):** Clean login card with demo hints.
-4. **Student Dashboard (`dashboard.php`):** 4 summary metric cards and recent complaints table.
-5. **New Complaint Form (`complaint_create.php`):** Submission form with category and location inputs.
-6. **My Complaints List (`complaints.php`):** Filtered complaint table with status and priority badges.
-7. **Search / Filter Results (`complaints.php?q=...`):** Search results showing active filter badges.
-8. **Complaint Details View (`complaint_view.php?id=...`):** Full problem description and timeline.
-9. **Edit Complaint (`complaint_edit.php?id=...`):** Edit form for a Pending complaint.
-10. **Admin Dashboard (`admin/dashboard.php`):** 5 global metric cards and campus-wide recent list.
-11. **Admin Complaints Queue (`admin/complaints.php`):** Global complaints list with student names.
-12. **Admin Status & Resolution Update (`admin/complaint_view.php?id=...`):** Controls showing status change and resolution note textarea.
-13. **Admin User Directory (`admin/users.php`):** Read-only table of registered users.
-14. **phpMyAdmin `users` Table:** Screenshot showing hashed passwords and roles.
-15. **phpMyAdmin `complaints` Table:** Screenshot showing schema, foreign key, and complaint codes.
+The Docker build installs locked Composer dependencies, checks required PHP extensions, enables Apache rules, sets upload limits, and lints application PHP files. Startup binds Apache to `0.0.0.0:$PORT`, runs migrations/bootstrap, and starts Apache only when initialization succeeds. Application data remains in the external database; image assets remain in Cloudinary.
 
----
+## Protected images and maintenance
 
-## 18. Live Demonstration Script
+| Rule | Implementation |
+| --- | --- |
+| Accepted formats | JPEG, PNG, and WebP; MIME type and image dimensions are checked server-side. |
+| Size | Maximum 5 MiB per image; width and height must each be between 1 and 8000 pixels. |
+| Complaint limit | Three images total per complaint, including both before and after evidence. |
+| Student actions | Before-repair upload/removal on the student's own Pending complaint. Evidence is added from the complaint detail page after submission. |
+| Administrator actions | After-repair upload and removal of complaint evidence. |
+| Profile images | One optional image per student, with replace/remove actions. Delivery allows the owner or an administrator. |
+| Delivery | Authenticated Cloudinary assets fetched through session/permission-checked PHP routes with private, no-store headers. |
 
-Follow this sequential walkthrough during your project viva or live demonstration:
+The container sets `upload_max_filesize=5M` and `post_max_size=18M`. Configure equivalent PHP limits for local Apache if testing uploads. Without Cloudinary configuration, image actions are unavailable while other workflows remain usable.
 
-1. **Open Home Page:** Navigate to `http://localhost/CampusFix`. Explain the system purpose: *"CampusFix is a full-stack campus complaint tracking system built with PHP 8, PDO, and Bootstrap 5."*
-2. **Register a New Student:** Click **Register**. Create an account for a new student (e.g., `Tanvir Ahmed`, ID: `STU-2024-099`, email: `tanvir@campus.edu`, password: `password123`).
-3. **Login as New Student:** Log in with the newly created student credentials. Observe that the dashboard opens with 0 total complaints and an inviting empty state.
-4. **Create a Complaint:** Click **+ New Complaint**. Enter:
-   - Title: `Projector lamp failure in Lab 3`
-   - Category: `Classroom`
-   - Location: `Academic Building 1, Lab 3`
-   - Priority: `High`
-   - Description: `Projector fails to turn on and displays a solid red warning lamp.`
-   Click **Submit Complaint**.
-5. **Show Code Generation & Pending State:** Notice the tracking code format (`CMP-0009`) and the initial status badge: **Pending** (yellow).
-6. **Demonstrate Combined Filters:** Go to **My Complaints**. Type `Projector` into the search box, set Priority to `High`, and click **Filter**. Show how matching records are filtered dynamically.
-7. **Demonstrate Pending Edit:** Open the complaint details, click **Edit Complaint**, modify the location to `Academic Building 1, Lab 3 (North Wing)`, and save.
-8. **Demonstrate Ownership Security (URL Manipulation Defense):** Note the complaint ID in the URL (`id=9`). In the address bar, attempt to change the URL to `id=3` (belonging to student Arif). Observe that access is immediately denied: *"You do not have permission to access that complaint."*
-9. **Log Out Student:** Click **Logout**.
-10. **Log In as Admin:** Enter `admin@campusfix.edu` / `admin123`.
-11. **Open Admin Dashboard:** Show the 5 global cards (Total, Pending, In Progress, Resolved, High Priority) and point out the newly submitted complaint in the campus queue.
-12. **Update Status to In Progress:** Click **Manage** on the complaint. Update the status to **In Progress** and click **Update Complaint Status**.
-13. **Resolve Complaint with Resolution Note:** Return to the management form. Select status **Resolved**, enter the official note: *"Technician replaced the lamp module and calibrated the display on Sep 26."*, and submit.
-14. **Verify Student View & Locked Controls:** Log out as admin, log back in as student `tanvir@campus.edu`. Open the complaint:
-    - Status now displays **Resolved** (green).
-    - The official administrative resolution note is displayed in a dedicated green card.
-    - The **Edit** and **Delete** buttons are automatically locked and hidden.
-15. **Conclude Demo:** Log out cleanly.
+Failed provider deletions are queued for retry. From a trusted CLI with the deployment's database and Cloudinary configuration, run:
 
----
+```sh
+php database/media_cleanup.php
+```
 
-## Upgrade feature notes
+Schedule that command externally if automatic retries are desired; the repository does not include a scheduler service. See [image setup and failure handling](docs/images.md). Simultaneous provider/database failures can require manual reconciliation.
 
-- [Migration and recovery procedure](docs/migrations.md)
-- [Protected images and Cloudinary setup](docs/images.md)
-- [Complaint history, comments and notifications](docs/activity.md)
-- [Upgrade plan and verification status](docs/upgrade-plan.md)
+## Security controls
 
-The upgraded Docker deployment installs the Cloudinary PHP SDK through Composer during image build. `CLOUDINARY_URL` is required only for image actions; core complaint and activity features can run before it is configured. Keep its value in Render Environment, never in Git or this README.
+- Passwords are stored with `password_hash(..., PASSWORD_DEFAULT)` and checked with `password_verify()`.
+- Login regenerates the session ID; authentication and role checks use PHP sessions.
+- Student complaint reads/writes enforce ownership on the server; administrative routes require the admin role.
+- User-supplied query values are bound through PDO prepared statements; emulated prepares are disabled.
+- Shared HTML escaping is used for user-visible content, including comments and resolution notes.
+- Registration, login, complaint/profile forms, and protected write endpoints validate session CSRF tokens; deletion, comment, image, and notification actions require POST.
+- Related complaint updates, events, and notifications commit together in database transactions.
+- Image file content, count, size, and permissions are checked server-side; signed provider URLs are not embedded in the UI.
+- Apache rules restrict directory listing and access to application internals and sensitive file types. CLI bootstrap/migration/cleanup entry points reject browser execution.
 
-## 19. Viva Cheat Sheet (Questions & Answers)
+## Verification and troubleshooting
 
-### Q1: Why did you choose PHP 8 and MySQL over other stacks?
-> **Answer:** PHP and MySQL are native to standard web hosting environments like XAMPP, require zero external build tools (like npm or Composer), and provide direct native database access through PDO. This makes the architecture simple to explain, highly performant, and fully compliant with university curriculum standards.
+### Repository verification record
 
-### Q2: What does CRUD stand for, and where is it implemented in CampusFix?
-> **Answer:** CRUD stands for **Create, Read, Update, and Delete**:
-> - **Create:** Students submit complaints (`complaint_create.php`).
-> - **Read:** Students view their own complaints (`complaints.php`, `complaint_view.php`); administrators view all complaints (`admin/complaints.php`).
-> - **Update:** Students edit details while in Pending status (`complaint_edit.php`); administrators update priority, status, and resolution notes (`admin/complaint_update.php`).
-> - **Delete:** Students delete unwanted Pending complaints (`complaint_delete.php`).
+The following results are recorded in the repository documentation dated **2 October 2026**. They describe local checks, not a certification of the live deployment.
 
-### Q3: How are passwords stored and verified securely?
-> **Answer:** Passwords are never stored in plain text. When a user registers, PHP's `password_hash($password, PASSWORD_DEFAULT)` creates a salted bcrypt hash. Upon login, `password_verify($input, $hash)` performs a timing-safe cryptographic comparison.
+| Area | Recorded verification |
+| --- | --- |
+| Migrations | Populated/fresh MariaDB installations, reruns, partial-baseline rejection, and preservation of existing user/complaint rows. |
+| Image validation | Valid PNG accepted; disguised text and oversized content rejected. |
+| Cleanup retries | Fake-provider deletion failure queued; failed retry counted; successful retry removed the job. |
+| Activity and access | Local browser checks for owner/admin access, cross-account denial, comments/replies, status/priority events, notification ownership, and invalid input. |
+| Syntax and layout | PHP lint and a mobile review of the complaint detail page. |
+| Pending live checks | Actual Cloudinary upload/download/delete, TiDB staging, Docker build, and production browser verification. |
 
-### Q4: How is SQL Injection prevented?
-> **Answer:** SQL injection is prevented by exclusively using **PDO prepared statements** with parameter binding (`?`). User input is sent separately from the SQL statement structure to the MySQL parser, ensuring user input can never be executed as SQL commands. Emulated prepares are disabled (`PDO::ATTR_EMULATE_PREPARES => false`).
+Available focused commands, from the repository root:
 
-### Q5: How do you prevent students from viewing or editing another student's complaints?
-> **Answer:** We enforce **server-side authorization and ownership scoping**. We never trust the complaint ID from the URL alone. In student queries, we strictly query:
-> ```sql
-> WHERE id = ? AND user_id = ?
-> ```
-> where `user_id` is retrieved directly from `$_SESSION['user_id']`. If a student attempts to edit the URL to view another student's ID, the query returns no rows and access is blocked.
+```sh
+php tests/media_validation.php
+php tests/media_cleanup.php
+```
 
-### Q6: What is Role-Based Access Control (RBAC) and how does CampusFix enforce it?
-> **Answer:** RBAC restricts resource access based on user roles. In `includes/auth.php`, `requireStudent()` restricts pages to students and redirects admins, while `requireAdmin()` ensures only sessions with `$_SESSION['role'] === 'admin'` can access any page in the `/admin/` directory.
+The cleanup test must use a **dedicated, migrated test database** with test `DB_*` variables. It processes queued jobs through a fake provider and must not run against operational data. The validation test does not require a database or live provider. Both require the relevant PHP extensions.
 
-### Q7: Why do we have both client-side and server-side validation?
-> **Answer:** Client-side validation (HTML5 attributes and JavaScript) enhances user experience by providing immediate feedback without network latency. However, client-side validation can be bypassed by disabling JavaScript or using tools like cURL/Postman. Therefore, **server-side validation in PHP is authoritative and mandatory** for security and data integrity.
+For a shell with `find` and `xargs`, application syntax checks can be run with:
 
-### Q8: What database relationship exists between users and complaints?
-> **Answer:** A **One-to-Many (1:N)** relationship. One user can submit multiple complaints, but each complaint belongs to exactly one user. This is enforced via a foreign key constraint:
-> ```sql
-> CONSTRAINT fk_complaints_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-> ```
-> `ON DELETE CASCADE` guarantees that if a user account is deleted, all their associated complaints are cleaned up automatically without leaving orphaned records.
+```sh
+find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n 1 php -l
+```
 
-### Q9: Why are PHP sessions used?
-> **Answer:** HTTP is a stateless protocol; each request is independent. PHP sessions store authenticated state (`user_id`, `role`, `full_name`) on the server across multiple HTTP requests, identified by an encrypted session cookie sent by the browser.
+See [migration checks](docs/migrations.md), [image checks](docs/images.md), and [activity checks](docs/activity.md) for their exact scope and outstanding verification.
 
-### Q10: What is CSRF and how does CampusFix defend against it?
-> **Answer:** **Cross-Site Request Forgery (CSRF)** occurs when a malicious website tricks an authenticated user's browser into submitting an unauthorized state-changing request (such as deleting a complaint). CampusFix defends against this by generating a unique, cryptographically random `csrf_token` stored in the session and embedding it as a hidden field in all POST forms. The server validates the submitted token using `hash_equals()` before executing any database write.
+### Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Dockerfile not found | Selected commit/branch, empty Root Directory, and `./Dockerfile` path. |
+| Database 503 or bootstrap failure | Database already exists; host, port, credentials, TLS settings, and provider network access are correct. |
+| Missing activity/image tables | Run the current migrations; importing only `database/schema.sql` does not install the upgraded schema. |
+| Migration checksum or partial-schema error | Inspect the logs/schema and follow [recovery instructions](docs/migrations.md); add a reviewed migration rather than editing an applied file. |
+| Image storage unavailable | `CLOUDINARY_URL`, installed Composer dependencies, required PHP extensions, and redeployment after environment configuration. |
+| Upload rejected | Supported file content, 5 MiB size limit, three-image total, PHP request limits, ownership, and complaint status. |
+| Incorrect local links | Apache document root and `APP_BASE_URL`; restart Apache after changing its environment. |
+| Bootstrap credential validation fails | Valid email and a password of at least 12 characters; configure or remove both administrator variables together. |
+
+## Project demonstration
+
+1. Register a student and show the personal dashboard.
+2. Submit a complaint with category, location, priority, and description; show its tracking code and Pending state.
+3. Open the detail page, add before-repair evidence if Cloudinary is configured, and post a comment.
+4. Demonstrate search/filtering and a Pending-only edit. Use separate test accounts to demonstrate ownership boundaries.
+5. Sign in as an administrator, review the campus queue and notification, and reply to the student.
+6. Change the status to In Progress, add after-repair evidence when configured, then resolve with a note.
+7. Return as the student to show the status/priority timeline, conversation, evidence, resolution note, and mark-as-read action.
+8. Show profile editing, optional profile-picture management, and the administrator's read-only user directory.
+
+Useful report screenshots include the landing page, registration/login, both dashboards, filtered complaint list, complaint detail with timeline/comments/evidence, admin resolution form, notifications, profile, and current migrated database relationships. Use synthetic records and omit real credentials and private student information from shared screenshots.
+
+## Documentation and viva notes
+
+| Document | Contents |
+| --- | --- |
+| [docs/migrations.md](docs/migrations.md) | Installation upgrades, backup/recovery procedure, and recorded database checks. |
+| [docs/images.md](docs/images.md) | Cloudinary configuration, protected delivery, limits, cleanup, and verification. |
+| [docs/activity.md](docs/activity.md) | Events, comments/replies, notifications, transactions, and access checks. |
+| [docs/upgrade-plan.md](docs/upgrade-plan.md) | Implementation milestones, verification status, and proposed later work. |
+
+<details>
+<summary>Viva preparation: key implementation questions</summary>
+
+| Question | Answer |
+| --- | --- |
+| Why PHP and PDO? | PHP runs the request handlers; PDO provides parameterized access to the MySQL-compatible database. Composer installs the Cloudinary dependency. |
+| Where is CRUD used? | Students create/read complaints and update/delete owned Pending records; administrators manage status, priority, and resolution notes. |
+| How are passwords protected? | `password_hash()` stores a salted hash and `password_verify()` checks it at login. The algorithm is selected by `PASSWORD_DEFAULT`. |
+| How is complaint ownership enforced? | Server-side checks compare the complaint owner with the authenticated user; restricted student queries include the user's ID. |
+| What is RBAC here? | The session role selects student/admin access guards and navigation. The current release has those two roles. |
+| Why validate on the server? | Browser checks improve feedback, but PHP checks enforce permitted values, ownership, status, file content, and limits. |
+| What is the main database relationship? | One user can submit many complaints; foreign keys also connect complaints to evidence, comments, events, and notifications. |
+| What do sessions store? | Authenticated user identity and role persist across requests through a server-side session identified by a browser cookie. |
+| How is CSRF addressed? | POST actions validate a random token from the current session using `hash_equals()`. |
+| Why use transactions? | Related state, history, and notification changes commit together or roll back together. Cloudinary operations use separate cleanup handling. |
+| How are images protected? | Cloudinary assets use authenticated delivery; PHP checks the account before downloading and returning the bytes. |
+| Why migrations? | Numbered schema changes and checksums make fresh installation and later upgrades trackable while preserving baseline records. |
+
+</details>
