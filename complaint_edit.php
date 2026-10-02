@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/activity.php';
 
 // Restrict access to authenticated students only
 requireStudent();
@@ -84,6 +85,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Security: Student cannot change status, resolution_note, complaint_code, or user_id
     if (empty($errors)) {
         try {
+            $pdo->beginTransaction();
+            $lockStmt = $pdo->prepare("SELECT status, priority, complaint_code FROM complaints WHERE id = ? AND user_id = ? FOR UPDATE");
+            $lockStmt->execute([$complaintId, $userId]);
+            $before = $lockStmt->fetch();
+            if (!$before || $before['status'] !== 'Pending') {
+                throw new RuntimeException('This complaint is no longer editable.');
+            }
             $updateStmt = $pdo->prepare("
                 UPDATE complaints 
                 SET title = ?, category = ?, location = ?, priority = ?, description = ? 
@@ -99,9 +107,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $userId
             ]);
 
+            if ($before['priority'] !== $priority) {
+                recordComplaintEvent($pdo, (int)$complaintId, (int)$userId, 'updated',
+                    'Pending', 'Pending', $before['priority'], $priority);
+                notifyAdmins($pdo, (int)$userId, (int)$complaintId, 'priority_changed',
+                    'Priority changed on ' . $before['complaint_code'] . '.');
+            }
+            $pdo->commit();
+
             set_flash('success', 'Complaint updated successfully.');
             redirect('complaint_view.php?id=' . $complaintId);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             error_log('Complaint Update Error: ' . $e->getMessage());
             $errors[] = 'An error occurred while updating the complaint. Please try again.';
         }

@@ -1,18 +1,28 @@
 # CampusFix — Campus Complaint Tracking System
 
+## Versioned database migrations
+
+Production startup now runs `database/migrations/*.sql` through `database/bootstrap.php` and records applied versions in `schema_migrations`. For a manual CLI run, use `php database/migrate.php`. Read [migration, backup and recovery instructions](docs/migrations.md) before upgrading an existing database. Existing `users` and `complaints` rows are preserved by the baseline migration.
+
+## Optional protected images
+
+Complaint evidence and student profile pictures use Cloudinary's authenticated delivery type. Set `CLOUDINARY_URL` only in the deployment environment; see [image setup and verification](docs/images.md). The rest of CampusFix works while image storage is unconfigured.
+
 ## Public deployment (Render + TiDB Cloud)
 
-The repository includes a root `Dockerfile`, `.dockerignore`, and `render.yaml`. The image uses PHP 8.4/Apache with PDO MySQL and mbstring, enables the application's Apache rules, and listens on Render's `PORT` (default `10000`). The production image includes only the clean database schema and bootstrap utility.
+The repository includes a root `Dockerfile`, `.dockerignore`, and `render.yaml`. The image uses PHP 8.4/Apache with PDO MySQL, cURL and mbstring, enables the application's Apache rules, and listens on Render's `PORT` (default `10000`). The image contains versioned migrations and Composer dependencies, while local demo SQL and setup endpoints are excluded.
 
 For an existing Render service:
 
 1. Use the **Docker** runtime and the **master** branch. Leave **Root Directory** empty, set **Dockerfile Path** to `./Dockerfile`, and leave **Docker Command** empty so the image's startup command runs.
 2. Create the MySQL-compatible database first, then set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` in Render's **Environment** settings. Use the database provider's connection values. For TiDB Cloud, set `DB_SSL=true`.
 3. Set `APP_BASE_URL=/`. For the first administrator, set a valid `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters.
-4. Choose **Manual Deploy → Deploy latest commit**. The startup script imports `database/schema.sql` and creates the administrator only if that email does not already exist; it does not reset an existing administrator's password.
+4. Back up the database, then choose **Manual Deploy → Deploy latest commit**. The startup script runs pending migrations and creates the administrator only if that email does not already exist; it does not reset an existing administrator's password. See [migration and recovery procedure](docs/migrations.md).
 5. After verifying the first admin login, remove **both** `ADMIN_EMAIL` and `ADMIN_PASSWORD` from Render. The bootstrap requires the pair when either is present, so leaving only the email would make a later startup fail.
 
 For a new service, you can use `render.yaml` as a Render Blueprint instead. Secrets marked `sync: false` must be entered in Render; they are not stored in Git. On an existing service, verify its Environment settings directly. The database must remain external to the web container.
+
+For protected images, set `CLOUDINARY_URL` in the service Environment. This secret is not required for core complaint and activity routes. After deploying the image-capable build, verify one authorized upload, view and removal before relying on the feature.
 
 A missing-Dockerfile build error means the selected commit or Dockerfile path is wrong. If the image builds but startup reports a database connection failure, check the database hostname, port, credentials, database name, TLS setting, and the provider's network access rules. Do not put database passwords into the Dockerfile.
 Do not import `database/campusfix.sql` into a public database: it contains demo users with published passwords. The Docker image excludes that file and the legacy `database/create_admin.php` endpoint. For local XAMPP demonstrations, the demo SQL remains available in the repository.
@@ -388,6 +398,15 @@ Follow this sequential walkthrough during your project viva or live demonstratio
 15. **Conclude Demo:** Log out cleanly.
 
 ---
+
+## Upgrade feature notes
+
+- [Migration and recovery procedure](docs/migrations.md)
+- [Protected images and Cloudinary setup](docs/images.md)
+- [Complaint history, comments and notifications](docs/activity.md)
+- [Upgrade plan and verification status](docs/upgrade-plan.md)
+
+The upgraded Docker deployment installs the Cloudinary PHP SDK through Composer during image build. `CLOUDINARY_URL` is required only for image actions; core complaint and activity features can run before it is configured. Keep its value in Render Environment, never in Git or this README.
 
 ## 19. Viva Cheat Sheet (Questions & Answers)
 

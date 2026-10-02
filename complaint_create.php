@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/activity.php';
 
 // Restrict access to students only
 requireStudent();
@@ -86,6 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update complaint record with unique formatted code
             $updateCodeStmt = $pdo->prepare("UPDATE complaints SET complaint_code = ? WHERE id = ?");
             $updateCodeStmt->execute([$complaintCode, $newId]);
+
+            recordComplaintEvent($pdo, $newId, (int)$userId, 'created', null, 'Pending', null, $priority);
+            notifyAdmins($pdo, (int)$userId, $newId, 'new_complaint', 'New complaint ' . $complaintCode . ' was submitted.');
 
             $pdo->commit();
 

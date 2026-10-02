@@ -14,6 +14,6 @@ fi
 sed -ri "s/^Listen [0-9]+$/Listen 0.0.0.0:${port}/" /etc/apache2/ports.conf
 sed -ri "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${port}>/" /etc/apache2/sites-available/000-default.conf
 
-# Initialize only the clean schema and an optional first administrator.
+# Apply pending additive migrations and provision an optional first administrator.
 php /var/www/html/database/bootstrap.php
 exec apache2-foreground

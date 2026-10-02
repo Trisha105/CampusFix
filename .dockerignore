@@ -15,8 +15,11 @@ Thumbs.db
 desktop.ini
 database/campusfix.sql
 database/create_admin.php
+vendor/
 Dockerfile
 .dockerignore
 render.yaml
 README.md
+docs/
+tests/
 /tmp
