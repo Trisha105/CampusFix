@@ -10,15 +10,24 @@ Complaint evidence and student profile pictures use Cloudinary's authenticated d
 
 ## Public deployment (Render + TiDB Cloud)
 
-The Docker image runs PHP/Apache and initializes an empty MySQL-compatible database at startup. Connect this repository to a Render web service using `render.yaml`, and create a TiDB Cloud database first. Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` in Render. Leave `DB_SSL=true`. Set `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters for the first administrator. The startup script creates the tables and administrator once; it does not reset an existing administrator's password. After the first successful deploy, remove `ADMIN_PASSWORD` from Render's environment settings so it is not retained there.
+The repository includes a root `Dockerfile`, `.dockerignore`, and `render.yaml`. The image uses PHP 8.4/Apache with PDO MySQL, cURL and mbstring, enables the application's Apache rules, and listens on Render's `PORT` (default `10000`). The image contains versioned migrations and Composer dependencies, while local demo SQL and setup endpoints are excluded.
 
+For an existing Render service:
+
+1. Use the **Docker** runtime and the **master** branch. Leave **Root Directory** empty, set **Dockerfile Path** to `./Dockerfile`, and leave **Docker Command** empty so the image's startup command runs.
+2. Create the MySQL-compatible database first, then set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` in Render's **Environment** settings. Use the database provider's connection values. For TiDB Cloud, set `DB_SSL=true`.
+3. Set `APP_BASE_URL=/`. For the first administrator, set a valid `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters.
+4. Back up the database, then choose **Manual Deploy → Deploy latest commit**. The startup script runs pending migrations and creates the administrator only if that email does not already exist; it does not reset an existing administrator's password. See [migration and recovery procedure](docs/migrations.md).
+5. After verifying the first admin login, remove **both** `ADMIN_EMAIL` and `ADMIN_PASSWORD` from Render. The bootstrap requires the pair when either is present, so leaving only the email would make a later startup fail.
+
+For a new service, you can use `render.yaml` as a Render Blueprint instead. Secrets marked `sync: false` must be entered in Render; they are not stored in Git. On an existing service, verify its Environment settings directly. The database must remain external to the web container.
+
+For protected images, set `CLOUDINARY_URL` in the service Environment. This secret is not required for core complaint and activity routes. After deploying the image-capable build, verify one authorized upload, view and removal before relying on the feature.
+
+A missing-Dockerfile build error means the selected commit or Dockerfile path is wrong. If the image builds but startup reports a database connection failure, check the database hostname, port, credentials, database name, TLS setting, and the provider's network access rules. Do not put database passwords into the Dockerfile.
 Do not import `database/campusfix.sql` into a public database: it contains demo users with published passwords. The Docker image excludes that file and the legacy `database/create_admin.php` endpoint. For local XAMPP demonstrations, the demo SQL remains available in the repository.
 
 The older local XAMPP instructions and demo credentials below apply only to local development.
-
-## Read-only demo complaints
-
-The public **Demo Complaints** page (`demo_complaints.php`) shows ten illustrative campus reports with filters, status badges, local SVG placeholders, upvote counts, and a status timeline on each detail page. The sample records live only in `data/demo_complaints.php`; they are never imported into the production `complaints` table. Student and administrator complaint lists keep using real database records and their existing access rules. To replace the samples with API data, change the data source loaded by `demo_complaints.php` and `demo_complaint_view.php`; to remove the showcase, remove those routes and their navigation links.
 
 A full-stack, university-grade web application designed for campus facility maintenance, problem reporting, and structured administrative resolution.
 

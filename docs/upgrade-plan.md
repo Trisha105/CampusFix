@@ -4,10 +4,10 @@ Status: M1–M4 implemented on the local feature branch as of 2 October 2026. Pr
 
 ## Current architecture and baseline
 
-- Render builds `Dockerfile` (`php:8.2-apache`) and runs `database/bootstrap.php` before Apache. `render.yaml` sets `autoDeploy: true` and names the database and first-admin environment variables. The repository's local `database/campusfix.sql` and legacy admin setup endpoint are excluded from the image.
+- Render builds `Dockerfile` (`php:8.4-apache-bookworm`) and runs `database/bootstrap.php` before Apache. `render.yaml` deploys commits on `master` and names the database, Cloudinary and first-admin environment variables. The repository's local `database/campusfix.sql` and legacy admin setup endpoint are excluded from the image.
 - PHP route files render Bootstrap HTML directly. `includes/auth.php` uses sessions and student/admin role checks. `includes/functions.php` supplies CSRF tokens, escaping, taxonomies and flash messages. Student complaint queries are scoped to `user_id`; administrators can view and update any complaint.
-- `config/database.php` connects PDO to a MySQL-compatible database using environment variables. Production `database/schema.sql` contains only `users` and `complaints`, linked by `complaints.user_id -> users.id`. The startup bootstrap reruns `CREATE TABLE IF NOT EXISTS` and conditionally creates the first administrator.
-- The public sample gallery is stored in `data/demo_complaints.php`, not the operational database. Its menu and Home links have been removed in local commit `8e563ca`; direct sample URLs remain available. That commit was not confirmed pushed to GitHub.
+- `config/database.php` connects PDO to a MySQL-compatible database using environment variables. The baseline production schema contains `users` and `complaints`, linked by `complaints.user_id -> users.id`. The startup bootstrap applies additive versioned migrations and conditionally creates the first administrator.
+- The public sample gallery was removed from the current production `master` branch. The upgrade merge preserves that removal; operational complaint rows remain unchanged.
 - Existing complaint status is a single field. There are no persisted status events, comments, notifications, uploads, or profile images. No automated test suite or migration history is present.
 
 ## Invariants for every milestone
@@ -40,7 +40,7 @@ Add up to three complaint images (each at most 5 MB) with server-side MIME/conte
 
 Acceptance: valid images upload and display to authorized users, invalid/oversize images fail, fourth image fails, cross-account and guest access fail, removed images become unavailable, and provider failures leave no falsely referenced DB row. Automated tests use a fake provider; live tests require the configured account.
 
-**Status:** PHP routes, guarded image proxy, migration, SDK packaging and local validation/authorization checks implemented. Live Cloudinary upload/download/delete and Docker build are pending provider configuration and a Docker builder. The owner chose to configure Cloudinary later.
+**Status:** PHP routes, guarded image proxy, migration, SDK packaging and local validation/authorization checks implemented. A Cloudinary free account has been created and `CLOUDINARY_URL` saved in Render Environment without redeploying. Live Cloudinary upload/download/delete and Docker build verification remain pending.
 
 ### M4 — history, comments and in-app notifications
 

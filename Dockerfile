@@ -3,54 +3,41 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-FROM php:8.2-apache
+FROM php:8.4-apache-bookworm
 
-# Install system dependencies and SSL certificates
-RUN apt-get update && apt-get install -y \
-    libssl-dev \
-    libcurl4-openssl-dev \
-    libonig-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# The final image requires verified TLS, PDO MySQL, mbstring and cURL.
+RUN apt-get update && apt-get install -y --no-install-recommends libcurl4-openssl-dev libonig-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql curl mbstring \
+    && php -r 'exit(extension_loaded("pdo_mysql") && extension_loaded("mbstring") && extension_loaded("curl") && extension_loaded("fileinfo") ? 0 : 1);' \
+    && a2enmod rewrite headers
 
-# Install required PHP extensions
-RUN docker-php-ext-install pdo pdo_mysql mysqli curl mbstring
-
-# Enable Apache rewrite rules and response headers
-RUN a2enmod rewrite headers
-
-# Set Apache document root to project root
-ENV APACHE_DOCUMENT_ROOT /var/www/html
-
-# Update Apache default site config
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-
-# Allow .htaccess overrides in document root
 RUN printf '%s\n' '<Directory /var/www/html>' \
-    'Options FollowSymLinks' \
+    'Options -Indexes +FollowSymLinks' \
     'AllowOverride All' \
     'Require all granted' \
     '</Directory>' > /etc/apache2/conf-available/campusfix.conf \
     && a2enconf campusfix
 
-# Copy project files into the container
-COPY . /var/www/html/
-COPY --from=php_dependencies /app/vendor /var/www/html/vendor
+WORKDIR /var/www/html
 
-RUN printf '%s\n' 'upload_max_filesize=5M' 'post_max_size=18M' > /usr/local/etc/php/conf.d/campusfix-uploads.ini
+# Explicit allowlist keeps local SQL/demo accounts and setup endpoints out.
+COPY *.php .htaccess ./
+COPY admin/ ./admin/
+COPY assets/ ./assets/
+COPY config/ ./config/
+COPY includes/ ./includes/
+COPY database/bootstrap.php database/migrations.php database/migrate.php database/media_cleanup.php ./database/
+COPY database/migrations/ ./database/migrations/
+COPY docker/start.sh /usr/local/bin/campusfix-start
+COPY --from=php_dependencies /app/vendor ./vendor/
 
-# Fail the build if versioned database migrations were omitted from the image.
-RUN test -f /var/www/html/database/migrations/001_baseline.sql \
-    && test -f /var/www/html/database/migrations.php
+RUN printf '%s\n' 'upload_max_filesize=5M' 'post_max_size=18M' > /usr/local/etc/php/conf.d/campusfix-uploads.ini \
+    && test -f database/migrations/003_activity.sql \
+    && test -f vendor/autoload.php \
+    && chmod 755 /usr/local/bin/campusfix-start \
+    && find /var/www/html -path /var/www/html/vendor -prune -o -name '*.php' -print0 | xargs -0 -n 1 php -l
 
-# Fix permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && find /var/www/html -type d -exec chmod 755 {} \; \
-    && find /var/www/html -type f -exec chmod 644 {} \;
-
-# Expose port 80
-EXPOSE 80
-
-# Start Apache in foreground
-CMD ["sh", "-c", "php /var/www/html/database/bootstrap.php && exec apache2-foreground"]
+ENV PORT=10000 APP_BASE_URL=/
+EXPOSE 10000
+CMD ["/usr/local/bin/campusfix-start"]

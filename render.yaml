@@ -1,11 +1,16 @@
 services:
   - type: web
     name: campusfix
-    env: docker
+    runtime: docker
+    branch: master
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
-    autoDeploy: true
+    autoDeployTrigger: commit
+    healthCheckPath: /
     envVars:
+      - key: PORT
+        value: "10000"
       - key: APP_BASE_URL
         value: "/"
       - key: DB_SSL
@@ -19,6 +24,8 @@ services:
       - key: DB_USER
         sync: false
       - key: DB_PASS
+        sync: false
+      - key: CLOUDINARY_URL
         sync: false
       - key: ADMIN_EMAIL
         sync: false

@@ -1,29 +1,25 @@
-# Git
 .git
 .gitignore
-
-# Docker
-Dockerfile
-.dockerignore
-
-# Local-only demo data and legacy setup endpoint
-database/campusfix.sql
-database/create_admin.php
-
-# Local dev files
+.github
+.vscode
+.idea
+.env
+.env.*
+**/.env
+**/.env.*
 *.log
 error_log
 *.session
-vendor/
-
-# OS files
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# IDE
-.vscode/
-.idea/
-
-# Local XAMPP scratch copies
-/tmp/
+database/campusfix.sql
+database/create_admin.php
+vendor/
+Dockerfile
+.dockerignore
+render.yaml
+README.md
+docs/
+tests/
+/tmp
