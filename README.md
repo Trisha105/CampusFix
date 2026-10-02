@@ -4,6 +4,10 @@
 
 Production startup now runs `database/migrations/*.sql` through `database/bootstrap.php` and records applied versions in `schema_migrations`. For a manual CLI run, use `php database/migrate.php`. Read [migration, backup and recovery instructions](docs/migrations.md) before upgrading an existing database. Existing `users` and `complaints` rows are preserved by the baseline migration.
 
+## Optional protected images
+
+Complaint evidence and student profile pictures use Cloudinary's authenticated delivery type. Set `CLOUDINARY_URL` only in the deployment environment; see [image setup and verification](docs/images.md). The rest of CampusFix works while image storage is unconfigured.
+
 ## Public deployment (Render + TiDB Cloud)
 
 The Docker image runs PHP/Apache and initializes an empty MySQL-compatible database at startup. Connect this repository to a Render web service using `render.yaml`, and create a TiDB Cloud database first. Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` in Render. Leave `DB_SSL=true`. Set `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters for the first administrator. The startup script creates the tables and administrator once; it does not reset an existing administrator's password. After the first successful deploy, remove `ADMIN_PASSWORD` from Render's environment settings so it is not retained there.

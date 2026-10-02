@@ -186,4 +186,34 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php
+$profileImageStmt = $pdo->prepare('SELECT user_id FROM profile_images WHERE user_id = ?');
+$profileImageStmt->execute([currentUserId()]);
+$hasProfileImage = (bool)$profileImageStmt->fetchColumn();
+?>
+<section class="container pb-4" aria-labelledby="profile-image-heading">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h2 id="profile-image-heading" class="h5 fw-bold">Profile picture</h2>
+            <?php if ($hasProfileImage): ?>
+                <img class="rounded-circle evidence-image mb-3" style="width:120px;height:120px" src="<?= base_url('profile_image.php?user_id=' . currentUserId()); ?>" alt="Your profile picture">
+                <form method="POST" action="<?= base_url('profile_image_delete.php'); ?>" class="form-delete mb-3" data-confirm="Remove your profile picture?">
+                    <?= csrf_field(); ?>
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove picture</button>
+                </form>
+            <?php endif; ?>
+            <?php if ((getenv('CLOUDINARY_URL') ?: '') !== ''): ?>
+            <form method="POST" action="<?= base_url('profile_image_upload.php'); ?>" enctype="multipart/form-data">
+                <?= csrf_field(); ?>
+                <label class="form-label" for="profile-image-input">Choose a JPEG, PNG or WebP image (maximum 5 MB)</label>
+                <input class="form-control" id="profile-image-input" type="file" name="profile_image" accept="image/jpeg,image/png,image/webp" required data-image-preview="profile-image-preview" data-max-files="1">
+                <div id="profile-image-preview" class="d-flex gap-2 mt-2" aria-live="polite"></div>
+                <button class="btn btn-primary mt-3" type="submit">Save picture</button>
+            </form>
+            <?php else: ?>
+                <p class="text-muted small mb-0">Profile picture storage is not configured yet.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+</section>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

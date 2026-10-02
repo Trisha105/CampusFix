@@ -30,6 +30,5 @@ desktop.ini
 .env.local
 .env.production
 
-# Composer (not used, but just in case)
+# Composer dependencies are installed from the tracked lock file.
 /vendor/
-composer.lock

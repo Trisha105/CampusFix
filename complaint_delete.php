@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/media.php';
 
 // Restrict access to authenticated students only
 requireStudent();
@@ -54,14 +55,30 @@ if ($complaint['status'] !== 'Pending') {
 
 // 5. Execute Safe Deletion
 try {
+    $pdo->beginTransaction();
+    $imageStmt = $pdo->prepare('SELECT public_id FROM complaint_images WHERE complaint_id = ? FOR UPDATE');
+    $imageStmt->execute([$complaintId]);
+    $imageIds = $imageStmt->fetchAll(PDO::FETCH_COLUMN);
     $deleteStmt = $pdo->prepare("
         DELETE FROM complaints 
         WHERE id = ? AND user_id = ? AND status = 'Pending'
     ");
     $deleteStmt->execute([$complaintId, $userId]);
+    if ($deleteStmt->rowCount() !== 1) {
+        throw new RuntimeException('Complaint was changed before deletion.');
+    }
+    $pdo->commit();
+    foreach ($imageIds as $publicId) {
+        try {
+            (new CloudinaryMediaStore())->delete((string)$publicId);
+        } catch (Throwable $imageError) {
+            queueMediaCleanup($pdo, (string)$publicId, $imageError->getMessage());
+        }
+    }
 
     set_flash('success', 'Complaint ' . $complaint['complaint_code'] . ' deleted successfully.');
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('Complaint Deletion Error: ' . $e->getMessage());
     set_flash('danger', 'An error occurred while deleting the complaint.');
 }

@@ -63,4 +63,46 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }, 6000);
+
+    document.querySelectorAll('[data-image-preview]').forEach(function (input) {
+        const preview = document.getElementById(input.dataset.imagePreview);
+        if (!preview) return;
+        function renderSelection() {
+            preview.replaceChildren();
+            const files = Array.from(input.files || []);
+            const max = Number(input.dataset.maxFiles || 3);
+            if (files.length > max) {
+                input.setCustomValidity('Select at most ' + max + ' image(s).');
+            } else if (files.some(file => file.size > 5 * 1024 * 1024)) {
+                input.setCustomValidity('Each image must be at most 5 MB.');
+            } else {
+                input.setCustomValidity('');
+            }
+            files.forEach(function (file, index) {
+                const holder = document.createElement('div');
+                holder.className = 'border rounded p-1 text-center';
+                const img = document.createElement('img');
+                const url = URL.createObjectURL(file);
+                img.src = url;
+                img.alt = 'Selected image preview';
+                img.className = 'image-preview-thumb rounded d-block';
+                img.onload = function () { URL.revokeObjectURL(url); };
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'btn btn-sm btn-outline-danger mt-1';
+                remove.textContent = 'Remove';
+                remove.addEventListener('click', function () {
+                    const next = new DataTransfer();
+                    files.forEach(function (candidate, candidateIndex) {
+                        if (candidateIndex !== index) next.items.add(candidate);
+                    });
+                    input.files = next.files;
+                    renderSelection();
+                });
+                holder.append(img, remove);
+                preview.append(holder);
+            });
+        }
+        input.addEventListener('change', renderSelection);
+    });
 });

@@ -40,6 +40,8 @@ Add up to three complaint images (each at most 5 MB) with server-side MIME/conte
 
 Acceptance: valid images upload and display to authorized users, invalid/oversize images fail, fourth image fails, cross-account and guest access fail, removed images become unavailable, and provider failures leave no falsely referenced DB row. Automated tests use a fake provider; live tests require the configured account.
 
+**Status:** PHP routes, guarded image proxy, migration, SDK packaging and local validation/authorization checks implemented. Live Cloudinary upload/download/delete and Docker build are pending provider configuration and a Docker builder. The owner chose to configure Cloudinary later.
+
 ### M4 — history, comments and in-app notifications
 
 Dependencies: M2; M3 is completed first in this requested sequence so image events can use the same timeline.

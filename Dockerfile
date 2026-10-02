@@ -1,13 +1,20 @@
+FROM composer:2 AS php_dependencies
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
 FROM php:8.2-apache
 
 # Install system dependencies and SSL certificates
 RUN apt-get update && apt-get install -y \
     libssl-dev \
+    libcurl4-openssl-dev \
+    libonig-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install required PHP extensions
-RUN docker-php-ext-install pdo pdo_mysql mysqli
+RUN docker-php-ext-install pdo pdo_mysql mysqli curl mbstring
 
 # Enable Apache rewrite rules and response headers
 RUN a2enmod rewrite headers
@@ -29,6 +36,9 @@ RUN printf '%s\n' '<Directory /var/www/html>' \
 
 # Copy project files into the container
 COPY . /var/www/html/
+COPY --from=php_dependencies /app/vendor /var/www/html/vendor
+
+RUN printf '%s\n' 'upload_max_filesize=5M' 'post_max_size=18M' > /usr/local/etc/php/conf.d/campusfix-uploads.ini
 
 # Fail the build if versioned database migrations were omitted from the image.
 RUN test -f /var/www/html/database/migrations/001_baseline.sql \
