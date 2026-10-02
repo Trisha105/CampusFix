@@ -30,6 +30,10 @@ RUN printf '%s\n' '<Directory /var/www/html>' \
 # Copy project files into the container
 COPY . /var/www/html/
 
+# Fail the build if versioned database migrations were omitted from the image.
+RUN test -f /var/www/html/database/migrations/001_baseline.sql \
+    && test -f /var/www/html/database/migrations.php
+
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type d -exec chmod 755 {} \; \

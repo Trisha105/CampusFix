@@ -6,18 +6,11 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/migrations.php';
 
 try {
     $pdo = getDBConnection();
-    $sql = file_get_contents(__DIR__ . '/schema.sql');
-    if ($sql === false) {
-        throw new RuntimeException('Unable to read production schema.');
-    }
-    foreach (explode(';', $sql) as $statement) {
-        if (trim($statement) !== '') {
-            $pdo->exec($statement);
-        }
-    }
+    runMigrations($pdo);
 
     $email = trim(getenv('ADMIN_EMAIL') ?: '');
     $password = getenv('ADMIN_PASSWORD') ?: '';
