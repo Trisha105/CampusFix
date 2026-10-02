@@ -390,6 +390,15 @@ Follow this sequential walkthrough during your project viva or live demonstratio
 
 ---
 
+## Upgrade feature notes
+
+- [Migration and recovery procedure](docs/migrations.md)
+- [Protected images and Cloudinary setup](docs/images.md)
+- [Complaint history, comments and notifications](docs/activity.md)
+- [Upgrade plan and verification status](docs/upgrade-plan.md)
+
+The upgraded Docker deployment installs the Cloudinary PHP SDK through Composer during image build. `CLOUDINARY_URL` is required only for image actions; core complaint and activity features can run before it is configured. Keep its value in Render Environment, never in Git or this README.
+
 ## 19. Viva Cheat Sheet (Questions & Answers)
 
 ### Q1: Why did you choose PHP 8 and MySQL over other stacks?

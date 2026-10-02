@@ -9,6 +9,13 @@ $pageTitle = $pageTitle ?? 'CampusFix - Campus Complaint Tracking System';
 $currentPage = basename($_SERVER['PHP_SELF']);
 $currentDir  = basename(dirname($_SERVER['PHP_SELF']));
 $isAdminDir  = ($currentDir === 'admin');
+$unreadCount = 0;
+if (isLoggedIn()) {
+    require_once __DIR__ . '/../config/database.php';
+    $unreadStmt = getDBConnection()->prepare('SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND read_at IS NULL');
+    $unreadStmt->execute([(int)currentUserId()]);
+    $unreadCount = (int)$unreadStmt->fetchColumn();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -98,6 +105,7 @@ $isAdminDir  = ($currentDir === 'admin');
                     </li>
                 <?php else: ?>
                     <!-- Authenticated User Profile & Logout -->
+                    <li class="nav-item me-lg-2"><a class="nav-link" href="<?= base_url('notifications.php'); ?>" aria-label="Notifications, <?= $unreadCount; ?> unread"><i class="bi bi-bell me-1"></i>Notifications<?php if ($unreadCount): ?> <span class="badge bg-danger rounded-pill"><?= $unreadCount; ?></span><?php endif; ?></a></li>
                     <?php if (isStudent()): ?>
                         <li class="nav-item me-lg-2">
                             <a class="nav-link <?= ($currentPage === 'profile.php') ? 'active' : ''; ?>" href="<?= base_url('profile.php'); ?>">

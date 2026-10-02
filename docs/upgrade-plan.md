@@ -1,6 +1,6 @@
 # CampusFix upgrade plan
 
-Status: audit complete on 2 October 2026. Implement milestones in order and record observed results here. This plan describes proposed work; features beyond the baseline are not yet claimed as implemented.
+Status: M1–M4 implemented on the local feature branch as of 2 October 2026. Provider and production verification remain open; later milestones are proposals.
 
 ## Current architecture and baseline
 
@@ -49,6 +49,8 @@ Dependencies: M2; M3 is completed first in this requested sequence so image even
 Add tables for immutable complaint events, comments and notifications. Wrap complaint updates plus history/notification inserts in one database transaction. Record actor, timestamp, old/new status and priority; define a policy for preserving existing complaints with no backfilled event history. Permit owner/admin comments, with authorization on read and write. Add notification bell, unread count, list and CSRF-protected mark-as-read action. Escape all user text.
 
 Acceptance: owner/admin see the same ordered history; student B cannot read or comment on student A's complaint; a failed update makes no history/notification entry; notifications are visible only to recipients and mark-as-read changes only their own rows. Test empty, long and malicious-looking comment inputs.
+
+**Status:** migration `003_activity`, owner/admin conversation, transactionally recorded changes, bell/list/read actions implemented locally. MariaDB migration, browser cross-account and status/history checks passed. Invalid/HTML-like comment and rollback checks are recorded in `docs/activity.md`. Existing complaints intentionally have no fabricated historical events. Live deployment and TiDB staging remain pending.
 
 ### M5 — departments and technicians
 

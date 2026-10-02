@@ -106,3 +106,16 @@ document.addEventListener('DOMContentLoaded', function () {
         input.addEventListener('change', renderSelection);
     });
 });
+document.querySelectorAll('.reply-button').forEach((button) => {
+  button.addEventListener('click', () => {
+    document.getElementById('reply-parent-id').value = button.dataset.commentId;
+    document.getElementById('comment-label').textContent = 'Reply to comment';
+    document.getElementById('cancel-reply').classList.remove('d-none');
+    document.getElementById('comment-body').focus();
+  });
+});
+document.getElementById('cancel-reply')?.addEventListener('click', () => {
+  document.getElementById('reply-parent-id').value = '';
+  document.getElementById('comment-label').textContent = 'Add a comment';
+  document.getElementById('cancel-reply').classList.add('d-none');
+});
