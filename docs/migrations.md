@@ -6,7 +6,7 @@ Run migrations with `php database/migrate.php`. The Render container runs the sa
 
 ## Before deployment
 
-1. Take a database backup and verify that its file is non-empty. Store it outside the web root and limit access.
+1. Take a database backup. For a TiDB Cloud Starter cluster, a current-point-in-time branch is an isolated recovery point; verify that it becomes Active. If using an export, verify the file is non-empty and store it outside the web root.
 2. Record `SELECT COUNT(*) FROM users` and `SELECT COUNT(*) FROM complaints`, plus a few known IDs/codes. Plan a maintenance window for migrations that alter large tables.
 3. Deploy one application instance/migrator. `database/bootstrap.php` stops the container when migration fails, so review its logs before retrying.
 4. After migration, check `SELECT version, applied_at FROM schema_migrations ORDER BY version` and repeat the row counts.
@@ -26,7 +26,7 @@ Client TLS flags can differ by MySQL/MariaDB client version. Use the CA/TLS opti
 - If a migration fails, **do not delete its ledger row or blindly rerun a partially applied DDL file**. Inspect the schema and logs, reconcile partial changes in a new reviewed migration or restore a backup in an isolated environment first.
 - Roll back the application container to the previous commit if an additive migration leaves the old application compatible. Do not assume database DDL can be rolled back with `ROLLBACK`.
 - Restoring the backup discards writes made after that backup. Coordinate a maintenance window and preserve a copy of the current database before restoration. Example: `mysql --host=DB_HOST --port=DB_PORT --user=DB_USER --password --ssl-mode=REQUIRED < campusfix-before-upgrade.sql`.
-- Test recovery in a disposable database before any production restore. The current work has **not** run a production backup or restore.
+- Test recovery in a disposable database before any production restore. On 2 October 2026, a TiDB branch named `pre-upgrade-2026-10-02` was created and became Active before deployment. No export-file backup or restore exercise was run.
 
 ## Checks recorded on 2 October 2026
 
@@ -38,4 +38,4 @@ Local MariaDB 10.4.32, not production TiDB:
 - Production bootstrap on the fresh local database exited 0 and left both operational tables empty when no administrator credentials were configured.
 - PHP lint passed for the runner, migration library and bootstrap.
 
-TiDB staging migration, production backup/restore and Docker build remain unverified on this host.
+The Render Docker build and startup succeeded on 2 October 2026. Production TiDB `test` had the existing `users` and `complaints` tables before deployment; afterwards the SQL editor showed nine tables and `001_baseline`, `002_images`, `003_activity` in `schema_migrations`. Current counts were two users and one complaint. Pre-upgrade counts were not recorded, so production row-count preservation is not asserted. Isolated TiDB rehearsal and restore remain unverified.
